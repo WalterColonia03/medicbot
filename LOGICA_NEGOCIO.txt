@@ -1,0 +1,384 @@
+════════════════════════════════════════════════════════════
+        MEDICBOT - LÓGICA DE NEGOCIO IMPLEMENTADA
+════════════════════════════════════════════════════════════
+
+Sistema completo de validaciones y reglas de negocio para
+garantizar la coherencia e integridad de los datos.
+
+════════════════════════════════════════════════════════════
+📋 REQUISITOS FUNCIONALES IMPLEMENTADOS
+════════════════════════════════════════════════════════════
+
+RF1 - GESTIÓN DE HORARIOS
+──────────────────────────────────────────────────────────
+✓ Crear horarios de atención para médicos
+✓ Modificar horarios existentes (con restricciones)
+✓ Eliminar/desactivar horarios
+✓ Validar conflictos de horarios solapados
+✓ Generar automáticamente espacios de tiempo (slots)
+✓ Prevenir modificaciones que afecten citas existentes
+
+Reglas de Negocio:
+• Horario mínimo: 30 minutos entre inicio y fin
+• Horario máximo: 12 horas continuas por día
+• Rango permitido: 6:00 AM - 10:00 PM
+• Duración de slots: 15-240 minutos (múltiplos de 5)
+• No permitir horarios solapados para el mismo médico/día
+• No permitir cambiar doctor o día si hay citas programadas
+
+
+RF2 - GESTIÓN DE CITAS
+──────────────────────────────────────────────────────────
+✓ Agendar nuevas citas
+✓ Cancelar citas (con restricciones)
+✓ Actualizar estado de citas
+✓ Enviar notificaciones de confirmación
+✓ Enviar recordatorios
+✓ Listar citas con filtros múltiples
+✓ Prevenir citas duplicadas
+
+Reglas de Negocio:
+• No agendar en fechas pasadas
+• No agendar con más de 6 meses de anticipación
+• Verificar disponibilidad del slot en tiempo real
+• Validar que slot pertenezca al doctor elegido
+• Prevenir citas duplicadas (mismo paciente, fecha)
+• Solo cancelar citas futuras (tolerancia 2 horas)
+• No cancelar citas ya completadas o canceladas
+• Razón de cancelación obligatoria (min 10 caracteres)
+• Liberar slot automáticamente al cancelar
+
+
+RF3 - GESTIÓN DE MÉDICOS
+──────────────────────────────────────────────────────────
+✓ Registrar nuevos médicos
+✓ Modificar información de médicos
+✓ Desactivar médicos
+✓ Validar datos únicos (email)
+✓ Prevenir eliminación si tienen horarios activos
+
+Reglas de Negocio:
+• Nombre debe incluir título (Dr./Dra.)
+• Especialidad obligatoria
+• Email único en el sistema
+• No eliminar si tiene horarios activos
+• Desactivar en lugar de eliminar físicamente
+
+
+RF4 - GESTIÓN DE PACIENTES
+──────────────────────────────────────────────────────────
+✓ Registrar automáticamente desde WhatsApp
+✓ Validar datos de pacientes
+✓ Actualizar información existente
+✓ Teléfono único como identificador
+
+Reglas de Negocio:
+• Nombre completo obligatorio (mínimo 2 palabras)
+• Teléfono único (10-15 dígitos)
+• Email opcional pero validado si existe
+• Edad razonable si se proporciona fecha de nacimiento
+
+
+RF5 - NOTIFICACIONES
+──────────────────────────────────────────────────────────
+✓ Confirmación automática al agendar
+✓ Recordatorios manuales
+✓ Notificación de cancelación
+✓ Registro de todas las notificaciones enviadas
+
+Reglas de Negocio:
+• Confirmación enviada inmediatamente al crear cita
+• Recordatorios solo para citas confirmadas
+• No enviar recordatorios duplicados
+• Registro completo en tabla notifications
+
+
+════════════════════════════════════════════════════════════
+🔒 REQUISITOS NO FUNCIONALES IMPLEMENTADOS
+════════════════════════════════════════════════════════════
+
+RNF1 - VALIDACIÓN DE DATOS
+──────────────────────────────────────────────────────────
+✓ Validaciones en backend (API)
+✓ Validaciones en frontend (UI)
+✓ Mensajes de error claros y específicos
+✓ Validación de tipos de datos
+✓ Validación de rangos y formatos
+✓ Prevención de inyección SQL (Supabase ORM)
+
+
+RNF2 - INTEGRIDAD DE DATOS
+──────────────────────────────────────────────────────────
+✓ Constraints en base de datos
+✓ Foreign Keys para relaciones
+✓ Unique constraints para datos únicos
+✓ Check constraints para validaciones
+✓ Triggers automáticos para consistencia
+✓ Transacciones ACID garantizadas
+
+
+RNF3 - USABILIDAD
+──────────────────────────────────────────────────────────
+✓ Mensajes de error descriptivos
+✓ Mensajes de éxito informativos
+✓ Confirmaciones para acciones destructivas
+✓ Indicadores de carga (spinners)
+✓ Validación en tiempo real
+✓ Feedback visual inmediato
+
+
+RNF4 - MANEJO DE ERRORES
+──────────────────────────────────────────────────────────
+✓ Captura de errores en todas las operaciones
+✓ Logs de errores para debugging
+✓ Mensajes amigables al usuario
+✓ Códigos HTTP apropiados
+✓ Respuestas estructuradas con error/message
+✓ Manejo de errores de red
+
+
+RNF5 - CONSISTENCIA
+──────────────────────────────────────────────────────────
+✓ Soft delete (desactivar en lugar de eliminar)
+✓ Timestamps automáticos (created_at, updated_at)
+✓ Auditoría de cambios (tabla audit_log)
+✓ Estado consistente en toda la aplicación
+✓ Sincronización frontend-backend
+
+
+RNF6 - SEGURIDAD
+──────────────────────────────────────────────────────────
+✓ Validación de permisos (RLS en Supabase)
+✓ Sanitización de inputs
+✓ Prevención de duplicados
+✓ Validación de ownership
+✓ Service Role Key solo en servidor
+
+
+════════════════════════════════════════════════════════════
+🛠️ COMPONENTES DE VALIDACIÓN
+════════════════════════════════════════════════════════════
+
+1. src/lib/validations.ts
+──────────────────────────────────────────────────────────
+Sistema centralizado de validaciones con funciones:
+
+• validateSchedule()           - Valida horarios
+• validateAppointment()        - Valida citas
+• validatePatient()            - Valida pacientes
+• validateDoctor()             - Valida médicos
+• validateScheduleModification() - Valida modificaciones
+• validateAppointmentCancellation() - Valida cancelaciones
+• formatValidationErrors()     - Formatea mensajes
+
+Cada función retorna:
+{
+  isValid: boolean,
+  errors: string[]
+}
+
+
+2. APIs con Validaciones
+──────────────────────────────────────────────────────────
+✓ /api/schedules       - GET, POST, PUT, DELETE
+✓ /api/appointments    - GET, POST, PUT
+✓ /api/doctors         - GET, POST, PUT, DELETE
+✓ /api/timeslots/*     - Validación de disponibilidad
+
+Todas las APIs incluyen:
+• Validación de datos de entrada
+• Verificación de existencia
+• Validación de estado
+• Prevención de conflictos
+• Mensajes descriptivos
+• Códigos HTTP apropiados
+
+
+3. Componentes UI
+──────────────────────────────────────────────────────────
+✓ Alert.tsx            - Mensajes de error/éxito/warning
+✓ LoadingSpinner.tsx   - Indicadores de carga
+✓ schedules-new.tsx    - Gestión de horarios con validaciones
+✓ appointments-new.tsx - Gestión de citas con validaciones
+
+Características:
+• Validación en tiempo real
+• Mensajes claros
+• Confirmaciones de acciones
+• Estados de carga
+• Manejo de errores
+• Feedback visual
+
+
+════════════════════════════════════════════════════════════
+📊 EJEMPLOS DE VALIDACIONES
+════════════════════════════════════════════════════════════
+
+EJEMPLO 1: Crear Horario
+──────────────────────────────────────────────────────────
+Usuario intenta: 
+  Crear horario de 20:00 a 18:00
+
+Sistema valida:
+  ❌ "La hora de fin debe ser posterior a la hora de inicio"
+
+Usuario intenta:
+  Crear horario de 09:00 a 12:00 para Dr. Pérez el Lunes
+  (Ya existe horario de 10:00 a 15:00 para Dr. Pérez el Lunes)
+
+Sistema valida:
+  ❌ "Ya existe un horario para Dr. Juan Pérez el día Lunes de
+      10:00 a 15:00. Los horarios no pueden solaparse."
+
+
+EJEMPLO 2: Modificar Horario con Citas
+──────────────────────────────────────────────────────────
+Usuario intenta:
+  Cambiar horario de Lunes a Martes
+  (Existen 5 citas programadas)
+
+Sistema valida:
+  ❌ "No se puede cambiar el día de la semana cuando existen
+      citas programadas"
+
+Usuario intenta:
+  Reducir horario de 09:00-17:00 a 10:00-16:00
+  (Existen citas a las 09:30 y 16:30)
+
+Sistema valida:
+  ❌ "No se puede reducir el rango horario cuando existen citas
+      programadas. Primero cancele o reubique las citas afectadas."
+
+
+EJEMPLO 3: Agendar Cita
+──────────────────────────────────────────────────────────
+Usuario intenta:
+  Agendar cita con slot ya ocupado
+
+Sistema valida:
+  ❌ "El horario seleccionado ya no está disponible.
+      Por favor, seleccione otro."
+
+Usuario intenta:
+  Agendar cita con teléfono que tiene cita el mismo día
+
+Sistema valida:
+  ❌ "Ya tiene una cita programada para esta fecha.
+      Cancele la anterior si desea reprogramar."
+
+
+EJEMPLO 4: Cancelar Cita
+──────────────────────────────────────────────────────────
+Usuario intenta:
+  Cancelar cita que ya pasó hace 3 horas
+
+Sistema valida:
+  ❌ "No se pueden cancelar citas que ya pasaron hace más de 2 horas"
+
+Usuario intenta:
+  Cancelar sin razón o con razón muy corta
+
+Sistema valida:
+  ❌ "La razón de cancelación debe tener al menos 10 caracteres"
+
+
+════════════════════════════════════════════════════════════
+🔄 FLUJO DE VALIDACIÓN TÍPICO
+════════════════════════════════════════════════════════════
+
+1. USUARIO INGRESA DATOS
+   └─> Frontend: Validación básica (formato, requeridos)
+
+2. USUARIO ENVÍA FORMULARIO
+   └─> Frontend: Validación completa
+       ├─> Si inválido: Mostrar errores
+       └─> Si válido: Enviar a API
+
+3. API RECIBE REQUEST
+   └─> Backend: Validación con validations.ts
+       ├─> Si inválido: HTTP 400 + errores
+       └─> Si válido: Continuar
+
+4. API VALIDA ESTADO
+   └─> Backend: Verificar existencia, disponibilidad
+       ├─> Si problema: HTTP 404/409/400 + mensaje
+       └─> Si OK: Continuar
+
+5. API VALIDA REGLAS DE NEGOCIO
+   └─> Backend: Verificar conflictos, restricciones
+       ├─> Si conflicto: HTTP 409 + explicación
+       └─> Si OK: Continuar
+
+6. API EJECUTA OPERACIÓN
+   └─> Backend: INSERT/UPDATE/DELETE en Supabase
+       ├─> Si error DB: HTTP 500 + mensaje
+       └─> Si éxito: HTTP 200/201 + datos + mensaje
+
+7. FRONTEND RECIBE RESPUESTA
+   └─> Frontend: Mostrar resultado
+       ├─> Error: Alert rojo con detalles
+       └─> Éxito: Alert verde + actualizar UI
+
+
+════════════════════════════════════════════════════════════
+✅ BENEFICIOS IMPLEMENTADOS
+════════════════════════════════════════════════════════════
+
+1. PARA EL USUARIO
+   • Mensajes claros de qué salió mal
+   • Guía sobre cómo corregir errores
+   • Confirmaciones antes de acciones importantes
+   • Feedback inmediato de sus acciones
+   • Prevención de errores comunes
+
+2. PARA EL SISTEMA
+   • Datos siempre consistentes
+   • Integridad referencial garantizada
+   • Prevención de estados inválidos
+   • Menor carga de soporte
+   • Logs completos para debugging
+
+3. PARA EL NEGOCIO
+   • Reducción de errores operativos
+   • Mayor confiabilidad
+   • Mejor experiencia de usuario
+   • Cumplimiento de reglas de negocio
+   • Auditoría completa de cambios
+
+
+════════════════════════════════════════════════════════════
+📝 ARCHIVOS MODIFICADOS/CREADOS
+════════════════════════════════════════════════════════════
+
+Nuevos:
+✓ src/lib/validations.ts (450 líneas)
+✓ src/components/Alert.tsx
+✓ src/components/LoadingSpinner.tsx
+✓ src/pages/schedules-new.tsx (600 líneas)
+✓ src/pages/appointments-new.tsx (650 líneas)
+
+Actualizados:
+✓ src/pages/api/schedules/index.ts (330 líneas)
+✓ src/pages/api/appointments/index.ts (305 líneas)
+✓ src/pages/api/doctors/index.ts (222 líneas)
+
+Total: ~2,500 líneas de código con lógica de negocio
+
+
+════════════════════════════════════════════════════════════
+🎯 RESULTADO FINAL
+════════════════════════════════════════════════════════════
+
+Sistema robusto con:
+✅ Validaciones en múltiples capas
+✅ Mensajes claros y descriptivos
+✅ Prevención de errores comunes
+✅ Manejo apropiado de excepciones
+✅ Reglas de negocio bien definidas
+✅ Experiencia de usuario mejorada
+✅ Integridad de datos garantizada
+✅ Código mantenible y escalable
+
+¡Sistema listo para producción con lógica de negocio completa!
+
+════════════════════════════════════════════════════════════

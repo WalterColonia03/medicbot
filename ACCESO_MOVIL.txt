@@ -1,0 +1,315 @@
+════════════════════════════════════════════════════════════
+📱 GUÍA: ACCESO A LA APLICACIÓN DESDE EL MÓVIL
+════════════════════════════════════════════════════════════
+
+OBJETIVO:
+---------
+Hacer que la aplicación web MedicBot sea accesible desde tu
+móvil para demostrar su funcionamiento.
+
+
+════════════════════════════════════════════════════════════
+MÉTODO 1: USAR NGROK (MÁS FÁCIL) ⭐ RECOMENDADO
+════════════════════════════════════════════════════════════
+
+VENTAJAS:
+✅ Más fácil y rápido
+✅ No requiere configurar firewall
+✅ Funciona desde cualquier lugar (no solo WiFi local)
+✅ Ya lo tienes configurado para Twilio
+
+PASOS:
+------
+
+1️⃣ INICIAR LA APLICACIÓN
+   Ejecuta:
+   .\start-bot.bat
+
+2️⃣ OBTENER LA URL DE NGROK
+   En la ventana de PowerShell verás:
+   
+   ┌──────────────────────────────────────────┐
+   │ 🌐 URL pública ngrok:                    │
+   │ https://abcd-123-456.ngrok-free.app      │
+   └──────────────────────────────────────────┘
+   
+   Copia esta URL
+
+3️⃣ ABRIR EN EL MÓVIL
+   - Abre el navegador en tu móvil
+   - Pega la URL de ngrok
+   - ¡Listo! Verás la aplicación
+
+EJEMPLO:
+--------
+Si la URL es: https://xochitl-nonalignable.ngrok-free.app
+Accede desde tu móvil: https://xochitl-nonalignable.ngrok-free.app
+
+NOTA IMPORTANTE:
+----------------
+⚠️ La primera vez que accedas, ngrok mostrará una página
+   de advertencia. Simplemente haz clic en "Visit Site"
+
+
+════════════════════════════════════════════════════════════
+MÉTODO 2: RED LOCAL (WiFi)
+════════════════════════════════════════════════════════════
+
+REQUISITOS:
+✅ Tu PC y móvil deben estar en la misma red WiFi
+✅ Firewall de Windows debe permitir conexiones
+
+PASOS:
+------
+
+1️⃣ OBTENER TU IP LOCAL
+   Ejecuta en PowerShell:
+   .\get-ip.ps1
+   
+   Verás algo como:
+   ✅ Tu IP local es: 192.168.1.105
+   📱 Para acceder desde tu móvil: http://192.168.1.105:3000
+
+2️⃣ INICIAR SERVIDOR CON ACCESO RED LOCAL
+   Ejecuta:
+   .\start-bot-mobile.ps1
+   
+   Verás:
+   📱 URLs de acceso:
+      Desde esta PC:  http://localhost:3000
+      Desde tu móvil: http://192.168.1.105:3000
+
+3️⃣ CONFIGURAR FIREWALL (SI ES NECESARIO)
+   Si no puedes acceder desde el móvil:
+   
+   OPCIÓN A: Desactivar temporalmente el firewall
+   - Panel de Control → Sistema y Seguridad → Firewall de Windows
+   - "Activar o desactivar Firewall de Windows Defender"
+   - Desactivar para red privada
+   - ⚠️ RECUERDA VOLVER A ACTIVARLO DESPUÉS
+   
+   OPCIÓN B: Permitir puerto 3000 (Más seguro)
+   - Panel de Control → Firewall de Windows Defender
+   - Configuración avanzada
+   - Reglas de entrada → Nueva regla
+   - Tipo: Puerto
+   - Puerto TCP específico: 3000
+   - Permitir la conexión
+   - Aplicar a: Privado
+   - Nombre: "Next.js Dev Server"
+
+4️⃣ ACCEDER DESDE EL MÓVIL
+   - Conecta tu móvil a la misma WiFi que tu PC
+   - Abre el navegador
+   - Ingresa: http://TU_IP:3000
+   - Ejemplo: http://192.168.1.105:3000
+
+
+════════════════════════════════════════════════════════════
+COMPARACIÓN DE MÉTODOS:
+════════════════════════════════════════════════════════════
+
+┌─────────────────┬──────────────┬─────────────────┐
+│ Característica  │ ngrok        │ Red Local       │
+├─────────────────┼──────────────┼─────────────────┤
+│ Facilidad       │ ⭐⭐⭐⭐⭐      │ ⭐⭐⭐            │
+│ Velocidad       │ ⭐⭐⭐         │ ⭐⭐⭐⭐⭐          │
+│ Requiere WiFi   │ No           │ Sí              │
+│ Configuración   │ Ninguna      │ Firewall        │
+│ Acceso externo  │ Sí           │ No              │
+└─────────────────┴──────────────┴─────────────────┘
+
+RECOMENDACIÓN: Usa ngrok (Método 1) 🌟
+
+
+════════════════════════════════════════════════════════════
+VERIFICAR QUE LA APP SEA RESPONSIVE (MÓVIL)
+════════════════════════════════════════════════════════════
+
+La aplicación está diseñada con Tailwind CSS, que es
+responsive por defecto. Para verificar:
+
+DESDE TU PC:
+------------
+1. Abre Chrome
+2. Ve a: http://localhost:3000
+3. Presiona F12 (DevTools)
+4. Presiona Ctrl+Shift+M (Toggle device toolbar)
+5. Selecciona un dispositivo: iPhone 12, Galaxy S20, etc.
+6. Verás cómo se ve en móvil
+
+DESDE EL MÓVIL:
+---------------
+1. Sigue cualquiera de los 2 métodos anteriores
+2. Abre la app en tu móvil
+3. Navega por las diferentes páginas:
+   - Inicio (/)
+   - Doctores (/doctors)
+   - Horarios (/schedules)
+   - Citas (/appointments)
+
+
+════════════════════════════════════════════════════════════
+PÁGINAS PRINCIPALES PARA DEMOSTRAR:
+════════════════════════════════════════════════════════════
+
+1. PÁGINA PRINCIPAL
+   http://TU_URL/
+   - Muestra las opciones principales
+   - Dashboard con estadísticas
+
+2. GESTIÓN DE DOCTORES
+   http://TU_URL/doctors
+   - Lista de médicos
+   - Crear/editar/eliminar doctores
+
+3. GESTIÓN DE HORARIOS
+   http://TU_URL/schedules
+   - Configurar horarios con calendario
+   - Generar time slots
+
+4. GESTIÓN DE CITAS
+   http://TU_URL/appointments
+   - Ver citas agendadas
+   - Crear citas manualmente
+
+5. CHATBOT DE WHATSAPP
+   - Mostrar conversación en WhatsApp
+   - Proceso completo de reserva
+
+
+════════════════════════════════════════════════════════════
+GUIÓN DE DEMOSTRACIÓN SUGERIDO:
+════════════════════════════════════════════════════════════
+
+1️⃣ MOSTRAR LA APLICACIÓN WEB EN EL MÓVIL
+   "Aquí está la aplicación web corriendo en mi móvil"
+
+2️⃣ NAVEGAR POR LAS PÁGINAS
+   "Puedo ver los doctores, horarios y citas"
+
+3️⃣ CREAR UN HORARIO CON EL CALENDARIO
+   "Selecciono una fecha con el calendario visual"
+
+4️⃣ ABRIR WHATSAPP
+   "Ahora desde WhatsApp..."
+
+5️⃣ ENVIAR "HOLA" AL BOT
+   "El bot responde automáticamente"
+
+6️⃣ SEGUIR EL FLUJO DE RESERVA
+   "Selecciono doctor, fecha y hora"
+
+7️⃣ CONFIRMAR LA CITA
+   "La cita queda registrada"
+
+8️⃣ MOSTRAR EN LA APP WEB
+   "Y aquí aparece en la aplicación web"
+
+
+════════════════════════════════════════════════════════════
+SOLUCIÓN DE PROBLEMAS:
+════════════════════════════════════════════════════════════
+
+PROBLEMA: No puedo acceder desde el móvil (Red local)
+SOLUCIÓN:
+- Verifica que estés en la misma WiFi
+- Desactiva el firewall temporalmente
+- Usa ngrok en su lugar
+
+PROBLEMA: ngrok muestra "Visit Site" cada vez
+SOLUCIÓN:
+- Es normal, simplemente haz clic en "Visit Site"
+- Solo aparece la primera vez por sesión
+
+PROBLEMA: La app se ve mal en el móvil
+SOLUCIÓN:
+- La app usa Tailwind CSS responsive
+- Debería verse bien automáticamente
+- Si no, reporta el problema específico
+
+PROBLEMA: El chatbot no funciona
+SOLUCIÓN:
+- Verifica que ngrok esté configurado en Twilio
+- Revisa los logs del servidor
+- Confirma que el webhook esté activo
+
+
+════════════════════════════════════════════════════════════
+COMANDOS ÚTILES:
+════════════════════════════════════════════════════════════
+
+# Obtener IP local
+.\get-ip.ps1
+
+# Iniciar con acceso móvil (Red local)
+.\start-bot-mobile.ps1
+
+# Iniciar con ngrok (Recomendado)
+.\start-bot.bat
+
+# Ver IP manualmente
+ipconfig
+
+# Verificar puerto 3000
+netstat -an | findstr :3000
+
+
+════════════════════════════════════════════════════════════
+CAPTURAS SUGERIDAS PARA LA DEMOSTRACIÓN:
+════════════════════════════════════════════════════════════
+
+📸 Captura 1: Página principal en móvil
+📸 Captura 2: Lista de doctores
+📸 Captura 3: Calendario de horarios
+📸 Captura 4: Conversación de WhatsApp
+📸 Captura 5: Cita confirmada en la app
+📸 Captura 6: Panel de administración
+
+TIP: Usa el grabador de pantalla del móvil para hacer
+     un video de la demostración completa.
+
+
+════════════════════════════════════════════════════════════
+CHECKLIST DE PREPARACIÓN:
+════════════════════════════════════════════════════════════
+
+□ PC y móvil conectados a WiFi
+□ Servidor Next.js corriendo
+□ ngrok activo y configurado
+□ WhatsApp con el número de Twilio guardado
+□ Base de datos con doctores y horarios
+□ Batería del móvil cargada
+□ Internet estable
+□ Pantalla limpia (sin notificaciones)
+
+
+════════════════════════════════════════════════════════════
+RESUMEN RÁPIDO:
+════════════════════════════════════════════════════════════
+
+MÉTODO RECOMENDADO (ngrok):
+1. .\start-bot.bat
+2. Copia la URL de ngrok
+3. Abre en el móvil
+4. ¡Listo!
+
+MÉTODO ALTERNATIVO (Red local):
+1. .\get-ip.ps1
+2. .\start-bot-mobile.ps1
+3. Abre http://TU_IP:3000 en el móvil
+4. ¡Listo!
+
+
+════════════════════════════════════════════════════════════
+¿NECESITAS AYUDA?
+════════════════════════════════════════════════════════════
+
+Si tienes problemas, revisa:
+- Los logs en la ventana de PowerShell
+- La configuración del firewall
+- Que estés en la misma red WiFi
+- Que ngrok esté funcionando
+
+¡Éxito con tu demostración! 📱✨
+════════════════════════════════════════════════════════════

@@ -1,0 +1,308 @@
+════════════════════════════════════════════════════════════
+    🚀 GUÍA COMPLETA: CONFIGURAR TWILIO + NGROK
+════════════════════════════════════════════════════════════
+
+PROBLEMA ACTUAL:
+Twilio recibe tu "hola" pero no sabe qué hacer con él porque
+el webhook no está configurado.
+
+SOLUCIÓN:
+Configurar ngrok + Twilio para conectar WhatsApp con tu bot.
+
+════════════════════════════════════════════════════════════
+📦 PASO 1: INSTALAR NGROK
+════════════════════════════════════════════════════════════
+
+Opción A: Con Chocolatey (Recomendado para Windows)
+──────────────────────────────────────────────────────────
+1. Abre PowerShell como Administrador
+2. Ejecuta:
+   choco install ngrok
+
+Opción B: Descarga Manual
+──────────────────────────────────────────────────────────
+1. Ve a: https://ngrok.com/download
+2. Descarga la versión para Windows
+3. Descomprime el archivo ngrok.exe
+4. (Opcional) Mueve ngrok.exe a una carpeta en tu PATH
+
+
+════════════════════════════════════════════════════════════
+🔑 PASO 2: CREAR CUENTA EN NGROK (GRATIS)
+════════════════════════════════════════════════════════════
+
+1. Ve a: https://ngrok.com
+2. Haz clic en "Sign up" (crear cuenta)
+3. Regístrate con Google o email
+4. Verifica tu email
+
+5. Ve a: https://dashboard.ngrok.com/get-started/your-authtoken
+6. Copia tu "Authtoken" (se ve así: 2abc...xyz)
+
+7. Abre terminal/PowerShell y ejecuta:
+   ngrok config add-authtoken TU_TOKEN_AQUI
+
+Ejemplo:
+   ngrok config add-authtoken 2abcXYZ123_456defGHI789jklMNO
+
+
+════════════════════════════════════════════════════════════
+🚀 PASO 3: INICIAR TU SERVIDOR NEXT.JS
+════════════════════════════════════════════════════════════
+
+1. Abre terminal en la carpeta del proyecto:
+   cd c:\Users\walte\CascadeProjects\windsurf-project\medicbot
+
+2. Instala dependencias (si no lo has hecho):
+   npm install
+
+3. Inicia el servidor:
+   npm run dev
+
+4. Verifica que esté corriendo en:
+   http://localhost:3000
+
+⚠️ DEJA ESTA TERMINAL ABIERTA
+
+
+════════════════════════════════════════════════════════════
+🌐 PASO 4: EXPONER CON NGROK
+════════════════════════════════════════════════════════════
+
+1. Abre OTRA terminal/PowerShell (la del servidor queda corriendo)
+
+2. Ejecuta:
+   ngrok http 3000
+
+3. Verás algo como esto:
+
+   ┌─────────────────────────────────────────────────┐
+   │ Session Status    online                        │
+   │ Account           tu-email@gmail.com            │
+   │ Version           3.x.x                         │
+   │ Region            United States (us)            │
+   │ Forwarding        https://abcd-1234.ngrok.io -> │
+   │                   http://localhost:3000         │
+   └─────────────────────────────────────────────────┘
+
+4. COPIA la URL que dice "Forwarding" (https://abcd-1234.ngrok.io)
+
+⚠️ IMPORTANTE: 
+   - Esta URL es PÚBLICA
+   - Cualquiera con ella puede acceder
+   - Cambiará cada vez que reinicies ngrok (en plan gratuito)
+   - DEJA ESTA TERMINAL ABIERTA también
+
+
+════════════════════════════════════════════════════════════
+🔗 PASO 5: CONFIGURAR WEBHOOK EN TWILIO
+════════════════════════════════════════════════════════════
+
+1. Ve a Twilio Console:
+   https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn
+
+2. Haz clic en "Sandbox Settings" (Configuración del Sandbox)
+   O busca el menú: Messaging → Try it out → WhatsApp Sandbox
+
+3. Busca la sección "Sandbox Configuration"
+
+4. En el campo "WHEN A MESSAGE COMES IN":
+   
+   Pega tu URL de ngrok + la ruta del webhook:
+   https://abcd-1234.ngrok.io/api/webhook/twilio-supabase
+   
+   ⚠️ IMPORTANTE: Reemplaza "abcd-1234" con tu URL real de ngrok
+   ⚠️ NO olvides agregar "/api/webhook/twilio-supabase" al final
+
+5. Método: Asegúrate que diga "HTTP POST"
+
+6. Haz clic en "Save" (Guardar)
+
+
+════════════════════════════════════════════════════════════
+✅ PASO 6: VERIFICAR CONFIGURACIÓN
+════════════════════════════════════════════════════════════
+
+Verifica que tengas:
+
+Terminal 1 (Servidor):
+  npm run dev
+  → http://localhost:3000 corriendo ✓
+
+Terminal 2 (ngrok):
+  ngrok http 3000
+  → https://abcd-1234.ngrok.io → localhost:3000 ✓
+
+Twilio Webhook configurado:
+  URL: https://abcd-1234.ngrok.io/api/webhook/twilio-supabase
+  Método: POST ✓
+
+Archivo .env:
+  NEXT_PUBLIC_SUPABASE_URL=...
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+  SUPABASE_SERVICE_ROLE_KEY=...
+  TWILIO_ACCOUNT_SID=...
+  TWILIO_AUTH_TOKEN=...
+  TWILIO_WHATSAPP_NUMBER=+14155238886 ✓
+
+
+════════════════════════════════════════════════════════════
+🧪 PASO 7: PROBAR EL BOT
+════════════════════════════════════════════════════════════
+
+1. Abre WhatsApp en tu teléfono
+
+2. Envía cualquier mensaje al sandbox de Twilio:
+   "Hola"
+
+3. Si todo está bien, el bot debe responder:
+   
+   "¡Bienvenido al sistema de citas médicas! 🏥
+   
+    Selecciona un médico escribiendo el número:
+    
+    1. Dr. Juan Pérez - Medicina General
+    2. Dra. María González - Pediatría
+    
+    💡 Escribe "nueva cita" en cualquier momento para empezar de nuevo."
+
+4. En la terminal del servidor deberías ver logs:
+   POST /api/webhook/twilio-supabase 200 in Xms
+
+
+════════════════════════════════════════════════════════════
+❌ SOLUCIÓN DE PROBLEMAS
+════════════════════════════════════════════════════════════
+
+PROBLEMA 1: Bot no responde
+──────────────────────────────────────────────────────────
+✓ Verifica que ambas terminales estén corriendo
+✓ Verifica que la URL en Twilio sea correcta
+✓ Revisa la terminal del servidor por errores
+✓ Verifica que .env tenga todas las variables
+
+PROBLEMA 2: Error "No hay médicos disponibles"
+──────────────────────────────────────────────────────────
+✓ Ve a http://localhost:3000/schedules-new
+✓ Crea al menos un médico
+✓ Crea horarios para ese médico
+✓ Genera slots de tiempo
+
+PROBLEMA 3: ngrok "command not found"
+──────────────────────────────────────────────────────────
+✓ Reinstala ngrok
+✓ Verifica que esté en el PATH
+✓ Reinicia la terminal
+
+PROBLEMA 4: "Este horario ya no está disponible"
+──────────────────────────────────────────────────────────
+✓ Ve a la base de datos en Supabase
+✓ Verifica que haya time_slots con is_available = true
+✓ Regenera slots si es necesario
+
+PROBLEMA 5: Twilio "11200 HTTP retrieval failure"
+──────────────────────────────────────────────────────────
+✓ Verifica que ngrok esté corriendo
+✓ Verifica que el servidor Next.js esté corriendo
+✓ Revisa que la URL en Twilio sea exactamente la de ngrok
+
+
+════════════════════════════════════════════════════════════
+🔄 COMANDOS RÁPIDOS (RESUMEN)
+════════════════════════════════════════════════════════════
+
+Terminal 1 (Servidor):
+  cd c:\Users\walte\CascadeProjects\windsurf-project\medicbot
+  npm run dev
+
+Terminal 2 (ngrok):
+  ngrok http 3000
+
+Twilio Webhook:
+  https://TU-URL-DE-NGROK.ngrok.io/api/webhook/twilio-supabase
+
+
+════════════════════════════════════════════════════════════
+💡 CONSEJOS IMPORTANTES
+════════════════════════════════════════════════════════════
+
+1. Plan Gratuito de ngrok:
+   - La URL cambia cada vez que lo reinicias
+   - Tendrás que actualizar el webhook en Twilio cada vez
+   - Considera el plan de paga ($8/mes) para URL fija
+
+2. Para Producción:
+   - Despliega tu aplicación en Vercel/Netlify/Railway
+   - Usa la URL de producción en Twilio
+   - Ya no necesitas ngrok
+
+3. Seguridad:
+   - No compartas tu URL de ngrok públicamente
+   - Valida los requests de Twilio con el validateRequest()
+   - Usa variables de entorno (.env) para credenciales
+
+4. Desarrollo:
+   - Mantén ambas terminales abiertas mientras desarrollas
+   - Revisa los logs en la terminal del servidor
+   - Usa console.log() para debugging
+
+
+════════════════════════════════════════════════════════════
+✅ CHECKLIST FINAL
+════════════════════════════════════════════════════════════
+
+Antes de probar, verifica:
+
+[ ] npm install ejecutado
+[ ] .env configurado con todas las variables
+[ ] Schema SQL ejecutado en Supabase
+[ ] Al menos 1 doctor creado en el sistema
+[ ] Horarios creados para ese doctor
+[ ] Slots generados
+[ ] Terminal 1: npm run dev corriendo
+[ ] Terminal 2: ngrok http 3000 corriendo
+[ ] URL de ngrok copiada
+[ ] Webhook configurado en Twilio Console
+[ ] Enviado mensaje de prueba desde WhatsApp
+[ ] Bot responde con lista de médicos
+
+Si todos los checks están ✓, ¡tu bot está funcionando! 🎉
+
+
+════════════════════════════════════════════════════════════
+📞 EJEMPLO DE CONVERSACIÓN COMPLETA
+════════════════════════════════════════════════════════════
+
+Usuario: Hola
+Bot: ¡Bienvenido! Selecciona un médico:
+     1. Dr. Juan Pérez
+     2. Dra. María González
+
+Usuario: 1
+Bot: Has seleccionado a Dr. Juan Pérez
+     Selecciona una fecha:
+     1. Hoy (06/11/2024)
+     2. Mañana (07/11/2024)
+
+Usuario: 2
+Bot: Horarios disponibles:
+     1. 09:00 - 09:30
+     2. 09:30 - 10:00
+
+Usuario: 1
+Bot: Has seleccionado:
+     👨‍⚕️ Médico: Dr. Juan Pérez
+     📅 Fecha: 07/11/2024
+     🕐 Hora: 09:00 - 09:30
+     
+     Escribe tu nombre completo:
+
+Usuario: Juan García
+Bot: ✅ ¡Cita confirmada exitosamente!
+     Nombre: Juan García
+     Código: ABC12345
+     ¡Gracias!
+
+
+¡LISTO PARA USAR! 🚀
+════════════════════════════════════════════════════════════

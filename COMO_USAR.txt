@@ -1,0 +1,107 @@
+════════════════════════════════════════════════════════════
+    📱 CÓMO USAR EL BOT DE WHATSAPP
+════════════════════════════════════════════════════════════
+
+OPCIÓN 1: Script Automático (Recomendado)
+══════════════════════════════════════════════════════════════
+
+1. Doble clic en: start-bot.bat
+
+   O desde PowerShell:
+   .\start-bot.ps1
+
+2. El script hará todo automáticamente:
+   ✅ Inicia el servidor Next.js
+   ✅ Inicia ngrok
+   ✅ Muestra la URL del webhook
+   ✅ Copia la URL al portapapeles
+
+3. Solo pega la URL en Twilio y listo!
+
+
+OPCIÓN 2: Script Simple (Dos ventanas)
+══════════════════════════════════════════════════════════════
+
+1. Ejecuta: .\start-simple.ps1
+
+2. Se abrirán 2 ventanas:
+   - Ventana 1: Servidor Next.js
+   - Ventana 2: ngrok
+
+3. En la ventana de ngrok busca:
+   Forwarding: https://xxxx.ngrok-free.app
+
+4. Copia esa URL y agrégale:
+   /api/webhook/twilio-supabase
+
+5. Pega en Twilio Console
+
+
+OPCIÓN 3: Manual (Control total)
+══════════════════════════════════════════════════════════════
+
+Terminal 1:
+   npm run dev
+
+Terminal 2:
+   ngrok http 3000
+
+Copia la URL de ngrok y configura en Twilio
+
+
+════════════════════════════════════════════════════════════
+📋 CONFIGURAR EN TWILIO (SOLO UNA VEZ POR SESIÓN)
+════════════════════════════════════════════════════════════
+
+1. Ve a: https://console.twilio.com
+
+2. Menú → Messaging → Try it out → WhatsApp Sandbox
+
+3. Clic en "Sandbox Settings"
+
+4. En "WHEN A MESSAGE COMES IN" pega:
+   https://tu-url-ngrok.ngrok-free.app/api/webhook/twilio-supabase
+
+5. Método: HTTP POST
+
+6. Save
+
+
+════════════════════════════════════════════════════════════
+💬 PROBAR EN WHATSAPP
+════════════════════════════════════════════════════════════
+
+1. Envía al número del sandbox: Hola
+
+2. El bot responde con lista de médicos
+
+3. ¡Listo! Sigue las instrucciones del bot
+
+
+════════════════════════════════════════════════════════════
+🛑 DETENER TODO
+════════════════════════════════════════════════════════════
+
+Si usaste start-bot.ps1:
+   → Presiona Ctrl+C en la ventana del script
+
+Si usaste start-simple.ps1:
+   → Cierra ambas ventanas de PowerShell
+
+Si iniciaste manual:
+   → Ctrl+C en ambas terminales
+
+
+════════════════════════════════════════════════════════════
+💡 TIPS
+════════════════════════════════════════════════════════════
+
+• La URL de ngrok cambia cada vez que lo reinicias
+• Actualiza la URL en Twilio cada vez que reinicies
+• Mantén las ventanas abiertas mientras usas el bot
+• Ve a http://localhost:4040 para ver tráfico en tiempo real
+
+
+════════════════════════════════════════════════════════════
+🚀 ¡LISTO PARA USAR!
+════════════════════════════════════════════════════════════

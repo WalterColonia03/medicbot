@@ -1,0 +1,176 @@
+════════════════════════════════════════════════════════════
+    🔍 DIAGNÓSTICO DEL PROBLEMA
+════════════════════════════════════════════════════════════
+
+LOGS AGREGADOS PARA ENCONTRAR EL ERROR:
+
+En el BACKEND (API):
+✅ src/pages/api/schedules/index.ts
+   - Logs al inicio mostrando method y body
+   - Logs en cada validación (1, 2, 3)
+   - Logs al insertar en BD
+   - Logs de errores detallados
+
+En el FRONTEND:
+✅ src/pages/schedules-new.tsx
+   - Logs al iniciar envío
+   - Logs de datos del formulario
+   - Logs del payload enviado
+   - Logs de response status y data
+   - Logs de errores
+
+
+════════════════════════════════════════════════════════════
+🧪 PASOS PARA PROBAR Y VER LOS LOGS:
+════════════════════════════════════════════════════════════
+
+1. Abre la consola del navegador (F12)
+   → Pestaña "Console"
+
+2. Ve a: http://localhost:3000/schedules-new
+
+3. Llena el formulario de crear horario
+
+4. Haz clic en "Crear Horario"
+
+5. OBSERVA:
+   
+   En la CONSOLA DEL NAVEGADOR verás:
+   🚀 FRONTEND: Iniciando envío de formulario
+   📝 Datos del formulario: {...}
+   ✅ FRONTEND: Validación OK
+   📤 FRONTEND: Enviando payload: {...}
+   📥 FRONTEND: Response status: XXX
+   📥 FRONTEND: Response data: {...}
+
+   En la TERMINAL DEL SERVIDOR verás:
+   === SCHEDULES API ===
+   Method: POST
+   Body: {...}
+   📝 POST /api/schedules - Crear horario
+   🔍 Validación 1: Validando datos...
+   ✅ Validación 1 OK
+   🔍 Validación 2: Verificando médico...
+   ✅ Validación 2 OK - Doctor: Dr. XXX
+   🔍 Validación 3: Verificando conflictos...
+   📋 Horarios existentes: 0
+   ✅ Validación 3 OK
+   💾 Insertando horario en base de datos...
+   ✅ Horario creado exitosamente: uuid
+
+
+════════════════════════════════════════════════════════════
+❓ POSIBLES ERRORES Y SOLUCIONES:
+════════════════════════════════════════════════════════════
+
+ERROR 1: No aparecen logs en la terminal del servidor
+──────────────────────────────────────────────────────────
+CAUSA: El request no está llegando al backend
+SOLUCIÓN:
+  - Verifica que el servidor esté corriendo
+  - Verifica que estás en http://localhost:3000
+  - Revisa la consola del navegador por errores CORS
+
+
+ERROR 2: "❌ FRONTEND: Validación falló"
+──────────────────────────────────────────────────────────
+CAUSA: El formulario tiene errores de validación
+SOLUCIÓN:
+  - Revisa los errores mostrados en la consola
+  - Verifica que todos los campos estén llenos
+  - Verifica que doctor_id no esté vacío
+
+
+ERROR 3: "❌ Médico no encontrado"
+──────────────────────────────────────────────────────────
+CAUSA: No hay médicos en la base de datos
+SOLUCIÓN:
+  Ejecuta este SQL en Supabase:
+  
+  INSERT INTO doctors (name, specialty, is_active)
+  VALUES 
+    ('Dr. Juan Pérez', 'Medicina General', true),
+    ('Dra. María González', 'Pediatría', true);
+
+
+ERROR 4: "❌ Error al insertar: ..."
+──────────────────────────────────────────────────────────
+CAUSA: Error en la base de datos
+SOLUCIÓN:
+  - Verifica que el schema SQL esté ejecutado
+  - Verifica las credenciales en .env
+  - Revisa los permisos RLS en Supabase
+
+
+ERROR 5: "❌ FRONTEND: Error de conexión"
+──────────────────────────────────────────────────────────
+CAUSA: No se puede conectar al servidor
+SOLUCIÓN:
+  - Verifica que npm run dev esté corriendo
+  - Verifica que estés en http://localhost:3000
+  - Revisa firewall/antivirus
+
+
+════════════════════════════════════════════════════════════
+🎯 VERIFICACIÓN RÁPIDA:
+════════════════════════════════════════════════════════════
+
+1. ¿Servidor corriendo?
+   → Ve a la terminal y busca "Ready in X ms"
+
+2. ¿Hay médicos en la BD?
+   → Ve a Supabase Dashboard → Table Editor → doctors
+   → Si está vacía, inserta al menos 1 médico
+
+3. ¿El .env está bien configurado?
+   → Verifica que tenga NEXT_PUBLIC_SUPABASE_URL
+   → Verifica que tenga SUPABASE_SERVICE_ROLE_KEY
+
+4. ¿El schema SQL está ejecutado?
+   → Ve a Supabase → SQL Editor
+   → Ejecuta: SELECT * FROM schedules LIMIT 1;
+   → Si da error, ejecuta database/schema.sql
+
+
+════════════════════════════════════════════════════════════
+📝 COMANDOS ÚTILES:
+════════════════════════════════════════════════════════════
+
+Ver médicos en Supabase (SQL Editor):
+  SELECT * FROM doctors;
+
+Insertar médico de prueba:
+  INSERT INTO doctors (name, specialty, is_active)
+  VALUES ('Dr. Test', 'General', true);
+
+Ver horarios:
+  SELECT s.*, d.name as doctor_name 
+  FROM schedules s
+  JOIN doctors d ON s.doctor_id = d.id;
+
+Limpiar horarios:
+  DELETE FROM schedules;
+
+
+════════════════════════════════════════════════════════════
+✅ SIGUIENTE PASO:
+════════════════════════════════════════════════════════════
+
+1. REINICIA el servidor para que tome los cambios:
+   - Ctrl+C en las ventanas de PowerShell
+   - Ejecuta: .\start-bot.bat
+
+2. Abre http://localhost:3000/schedules-new
+
+3. Abre consola del navegador (F12)
+
+4. Intenta crear un horario
+
+5. ENVÍAME los logs que aparecen en:
+   - Consola del navegador
+   - Terminal del servidor
+
+Con esos logs podré decirte exactamente qué está fallando.
+
+
+════════════════════════════════════════════════════════════

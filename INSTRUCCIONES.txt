@@ -1,0 +1,151 @@
+======================================================
+  MEDICBOT - SISTEMA DE CITAS MÉDICAS POR WHATSAPP
+======================================================
+
+INSTRUCCIONES DE INSTALACIÓN Y CONFIGURACIÓN
+=============================================
+
+1. INSTALAR DEPENDENCIAS
+------------------------
+Abre una terminal en la carpeta del proyecto y ejecuta:
+
+    npm install
+
+Esto instalará todas las dependencias necesarias (Next.js, React, Firebase, Twilio, etc.)
+
+
+2. CONFIGURAR VARIABLES DE ENTORNO
+-----------------------------------
+Crea un archivo .env en la raíz del proyecto copiando .env.example:
+
+    cp .env.example .env
+
+Luego edita el archivo .env y configura:
+
+A) FIREBASE:
+   - Ve a https://console.firebase.google.com/
+   - Crea un nuevo proyecto
+   - Habilita Firestore Database
+   - Ve a "Configuración del proyecto" > "Tus aplicaciones" > Agregar app web
+   - Copia las credenciales y pégalas en .env
+   - Ve a "Configuración del proyecto" > "Cuentas de servicio"
+   - Genera una nueva clave privada y copia los valores
+
+B) TWILIO:
+   - Ve a https://www.twilio.com/
+   - Crea una cuenta (hay versión de prueba gratuita)
+   - Activa WhatsApp API Sandbox
+   - Copia Account SID, Auth Token y el número de WhatsApp
+
+
+3. INICIAR EL SERVIDOR DE DESARROLLO
+-------------------------------------
+Una vez configuradas las variables de entorno, ejecuta:
+
+    npm run dev
+
+El servidor se iniciará en http://localhost:3000
+
+
+4. CONFIGURAR WEBHOOK DE TWILIO
+--------------------------------
+Para que el chatbot funcione con WhatsApp:
+
+A) Para desarrollo local (usando ngrok):
+   - Instala ngrok: https://ngrok.com/
+   - En otra terminal ejecuta: ngrok http 3000
+   - Copia la URL que te da ngrok (ej: https://xxxx.ngrok.io)
+   - Ve a Twilio Console > WhatsApp Sandbox Settings
+   - En "When a message comes in" pon: https://xxxx.ngrok.io/api/webhook/twilio
+   - Método: POST
+
+B) Para producción:
+   - Despliega la app en Vercel, Netlify u otro servicio
+   - Usa la URL de producción para el webhook
+
+
+5. USAR LA APLICACIÓN
+----------------------
+A) PANEL WEB (Administración):
+   - Abre http://localhost:3000
+   - Ve a "Horarios" y crea horarios para los médicos
+   - Haz clic en "Generar Espacios de Tiempo" para cada horario
+   - Ve a "Citas" para ver todas las citas confirmadas
+
+B) CHATBOT DE WHATSAPP (Usuarios):
+   - Envía un mensaje al número de WhatsApp configurado
+   - Sigue las instrucciones del bot:
+     1. Selecciona un médico
+     2. Selecciona una fecha
+     3. Selecciona un horario
+     4. Escribe tu nombre
+     5. Recibirás confirmación de la cita
+
+
+6. ESTRUCTURA DE LA BASE DE DATOS (FIRESTORE)
+----------------------------------------------
+El sistema crea automáticamente estas colecciones:
+
+- schedules: Horarios de atención de los médicos
+- timeSlots: Espacios de tiempo disponibles
+- appointments: Citas confirmadas
+- chatSessions: Sesiones activas del chatbot
+
+
+7. FUNCIONALIDADES IMPLEMENTADAS
+---------------------------------
+✓ Programación de horarios de atención
+✓ Generación automática de slots de tiempo
+✓ Chatbot conversacional por WhatsApp
+✓ Reserva de citas por WhatsApp
+✓ Notificaciones automáticas
+✓ Panel web de administración
+✓ Listado de citas confirmadas
+✓ Filtrado por estado de citas
+✓ PWA (instalable en móvil)
+
+
+8. PROBAR LA APLICACIÓN MÓVIL (PWA)
+------------------------------------
+A) En Chrome (Android):
+   - Abre la aplicación en Chrome
+   - Toca el menú (⋮) > "Agregar a pantalla de inicio"
+
+B) En Safari (iOS):
+   - Abre la aplicación en Safari
+   - Toca el botón compartir
+   - Selecciona "Agregar a pantalla de inicio"
+
+
+9. COMANDOS ÚTILES
+-------------------
+- npm run dev     : Inicia servidor de desarrollo
+- npm run build   : Compila la aplicación para producción
+- npm run start   : Inicia servidor de producción
+- npm run lint    : Verifica errores de código
+
+
+10. SOLUCIÓN DE PROBLEMAS
+--------------------------
+- Si hay errores de TypeScript, asegúrate de que npm install completó correctamente
+- Si Firebase no funciona, verifica que las credenciales en .env sean correctas
+- Si Twilio no funciona, verifica que el webhook esté configurado
+- Los errores de lint son normales hasta que se instalen las dependencias
+
+
+11. SIGUIENTES PASOS
+---------------------
+1. Instala dependencias: npm install
+2. Configura variables de entorno: .env
+3. Inicia el servidor: npm run dev
+4. Configura horarios en el panel web
+5. Genera slots de tiempo
+6. Configura webhook de Twilio
+7. Prueba el chatbot enviando un mensaje por WhatsApp
+
+
+SOPORTE
+-------
+Para más información, consulta el archivo README.md
+
+======================================================
