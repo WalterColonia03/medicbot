@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseServer } from '@/lib/supabase/server';
 import { validateSchedule, validateScheduleModification, formatValidationErrors } from '@/lib/validations';
-import { parse, format as formatDate } from 'date-fns';
+import { parse, format as formatDate, isAfter } from 'date-fns';
+import { getPeruDateTime } from '../webhook/twilio-supabase';
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,46 +15,51 @@ export default async function handler(
   
   if (req.method === 'GET') {
     try {
-      const { doctorId } = req.query;
+      console.log('=== SCHEDULES API ===');
+      console.log('Method: GET');
+      console.log('Body:', req.body);
 
-      let query = supabaseServer
+      // Obtener todos los schedules con fechas específicas
+      const { data: schedules, error } = await supabaseServer
         .from('schedules')
         .select(`
           *,
           doctor:doctors(id, name, specialty)
         `)
         .eq('is_active', true)
-        .order('day_of_week');
+        .not('specific_date', 'is', null) // Solo schedules con fecha específica
+        .order('specific_date', { ascending: true })
+        .order('start_time', { ascending: true });
 
-      if (doctorId) {
-        query = query.eq('doctor_id', doctorId);
+      if (error) {
+        console.error('Error fetching schedules:', error);
+        return res.status(500).json({ 
+          error: 'Error al obtener horarios',
+          message: 'No se pudieron cargar los horarios. Intente nuevamente.'
+        });
       }
 
-      const { data: schedules, error } = await query;
-
-      if (error) throw error;
-
-      return res.status(200).json(schedules);
+      return res.status(200).json(schedules || []);
     } catch (error) {
-      console.error('Error fetching schedules:', error);
+      console.error('Error in GET /api/schedules:', error);
       return res.status(500).json({ 
-        error: 'Error al obtener horarios',
-        message: 'No se pudieron cargar los horarios. Intente nuevamente.'
+        error: 'Error interno del servidor',
+        message: 'Error al obtener horarios'
       });
     }
   }
 
   if (req.method === 'POST') {
     try {
-      const { doctor_id, day_of_week, start_time, end_time, slot_duration } = req.body;
+      const { doctor_id, specific_date, start_time, end_time, slot_duration } = req.body;
       console.log('📝 POST /api/schedules - Crear horario');
-      console.log('Datos recibidos:', { doctor_id, day_of_week, start_time, end_time, slot_duration });
+      console.log('Datos recibidos:', { doctor_id, specific_date, start_time, end_time, slot_duration });
 
       // VALIDACIÓN 1: Validar datos de entrada
       console.log('🔍 Validación 1: Validando datos de entrada...');
       const validation = validateSchedule({
         doctorId: doctor_id,
-        dayOfWeek: day_of_week,
+        specificDate: specific_date,
         startTime: start_time,
         endTime: end_time,
         slotDuration: slot_duration
@@ -68,7 +75,7 @@ export default async function handler(
       }
       console.log('✅ Validación 1 OK');
 
-      // VALIDACIÓN 2: Verificar que el doctor existe y está activo
+      // VALIDACIÓN 2: Verificar que el médico existe y está activo
       console.log('🔍 Validación 2: Verificando médico...');
       const { data: doctor, error: doctorError } = await supabaseServer
         .from('doctors')
@@ -80,7 +87,7 @@ export default async function handler(
         console.log('❌ Médico no encontrado:', doctorError?.message);
         return res.status(404).json({
           error: 'Médico no encontrado',
-          message: 'El médico seleccionado no existe en el sistema'
+          message: 'El médico especificado no existe'
         });
       }
 
@@ -93,21 +100,21 @@ export default async function handler(
       }
       console.log('✅ Validación 2 OK - Doctor:', doctor.name);
 
-      // VALIDACIÓN 3: Verificar conflictos con horarios existentes del mismo doctor
+      // VALIDACIÓN 3: Verificar conflictos con horarios existentes del mismo doctor en la misma fecha
       console.log('🔍 Validación 3: Verificando conflictos de horarios...');
-      const { data: existingSchedules, error: conflictError } = await supabaseServer
+      const { data: existingSchedules, error: conflictError } = await (supabaseServer
         .from('schedules')
-        .select('*')
+        .select('id, start_time, end_time')
         .eq('doctor_id', doctor_id)
-        .eq('day_of_week', day_of_week)
-        .eq('is_active', true);
+        .eq('specific_date', specific_date)
+        .eq('is_active', true) as any);
 
       if (conflictError) {
         console.log('❌ Error al consultar horarios:', conflictError.message);
         throw conflictError;
       }
 
-      console.log('📋 Horarios existentes:', existingSchedules?.length || 0);
+      console.log('📋 Horarios existentes en esta fecha:', existingSchedules?.length || 0);
 
       if (existingSchedules && existingSchedules.length > 0) {
         // Verificar solapamiento de horarios
@@ -119,46 +126,67 @@ export default async function handler(
           const existEnd = parse(existing.end_time, 'HH:mm', new Date());
 
           // Verificar si hay solapamiento
-          const hasOverlap = 
+          const hasOverlap =
             (newStart >= existStart && newStart < existEnd) ||
             (newEnd > existStart && newEnd <= existEnd) ||
             (newStart <= existStart && newEnd >= existEnd);
 
           if (hasOverlap) {
-            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
             return res.status(409).json({
               error: 'Conflicto de horarios',
-              message: `Ya existe un horario para ${doctor.name} el día ${dayNames[day_of_week]} de ${existing.start_time} a ${existing.end_time}. Los horarios no pueden solaparse.`,
+              message: `Ya existe un horario para este médico el ${new Date(specific_date).toLocaleDateString('es-ES')} de ${existing.start_time} a ${existing.end_time}. Los horarios no pueden solaparse.`,
               conflictingSchedule: existing
             });
           }
         }
       }
 
-      // VALIDACIÓN 4: Verificar que la duración del slot cabe en el rango horario
-      const startDate = parse(start_time, 'HH:mm', new Date());
-      const endDate = parse(end_time, 'HH:mm', new Date());
-      const totalMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+      // VALIDACIÓN 4: Si es hoy, verificar que la hora de inicio sea futura
+      console.log('🔍 Validación 4: Verificando hora para hoy...');
+      const selectedDate = new Date(specific_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDateOnly = new Date(selectedDate);
+      selectedDateOnly.setHours(0, 0, 0, 0);
 
-      if (totalMinutes < slot_duration) {
-        return res.status(400).json({
-          error: 'Duración inválida',
-          message: `La duración de cada cita (${slot_duration} min) debe ser menor al tiempo total disponible (${totalMinutes} min)`
-        });
+      if (selectedDateOnly.getTime() === today.getTime()) {
+        // Es hoy, verificar que la hora de inicio sea futura
+        const now = getPeruDateTime();
+        const scheduleStart = parse(start_time, 'HH:mm', new Date());
+        scheduleStart.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (!isAfter(scheduleStart, now)) {
+          return res.status(400).json({
+            error: 'Hora inválida',
+            message: 'Para horarios de hoy, la hora de inicio debe ser posterior a la hora actual'
+          });
+        }
+
+        // VALIDACIÓN 5: Verificar que la duración del slot cabe en el rango horario
+        const startDate = parse(start_time, 'HH:mm', new Date());
+        const endDate = parse(end_time, 'HH:mm', new Date());
+        const totalMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+
+        // Calcular cuántos slots se generarán
+        const numberOfSlots = Math.floor(totalMinutes / slot_duration);
+        console.log('✅ Validación 4 OK - Sin conflictos');
+        console.log('📊 Se generarán aproximadamente', numberOfSlots, 'slots');
+
+        if (totalMinutes < slot_duration) {
+          return res.status(400).json({
+            error: 'Duración inválida',
+            message: `La duración de cada cita (${slot_duration} min) debe ser menor al tiempo total disponible (${totalMinutes} min)`
+          });
+        }
       }
-
-      // Calcular cuántos slots se generarán
-      const numberOfSlots = Math.floor(totalMinutes / slot_duration);
-      console.log('✅ Validación 3 OK - Sin conflictos');
-      console.log('📊 Se generarán aproximadamente', numberOfSlots, 'slots');
 
       // Crear el horario
       console.log('💾 Insertando horario en base de datos...');
-      const { data: schedule, error: insertError } = await supabaseServer
+      const { data: schedule, error: insertError } = await (supabaseServer
         .from('schedules')
         .insert({
           doctor_id,
-          day_of_week,
+          specific_date,
           start_time,
           end_time,
           slot_duration,
@@ -168,7 +196,7 @@ export default async function handler(
           *,
           doctor:doctors(id, name, specialty)
         `)
-        .single();
+        .single() as any);
 
       if (insertError) {
         console.log('❌ Error al insertar:', insertError.message);
@@ -213,29 +241,30 @@ export default async function handler(
       }
 
       // VALIDACIÓN 1: Obtener horario existente
-      const { data: existingSchedule, error: fetchError } = await supabaseServer
+      const { data: existingSchedule, error: getError } = await (supabaseServer
         .from('schedules')
         .select('*')
         .eq('id', id)
-        .single();
+        .single() as any);
 
-      if (fetchError || !existingSchedule) {
+      if (getError || !existingSchedule) {
         return res.status(404).json({
           error: 'Horario no encontrado',
-          message: 'El horario que intenta modificar no existe'
+          message: 'El horario especificado no existe'
         });
       }
 
-      // VALIDACIÓN 2: Verificar si hay citas programadas con este horario
-      const { data: appointments, error: apptError } = await supabaseServer
-        .from('appointments')
-        .select('id')
-        .eq('status', 'confirmed')
-        .gte('appointment_date', formatDate(new Date(), 'yyyy-MM-dd'));
+      // VALIDACIÓN 2: Verificar si tiene citas programadas
+      const { data: appointments, error: apptError } = await (supabaseServer
+        .from('time_slots')
+        .select('id, slot_date, start_time, appointments!inner(id, status)')
+        .eq('schedule_id', id)
+        .gte('slot_date', formatDate(new Date(), 'yyyy-MM-dd')) as any);
 
       if (apptError) throw apptError;
 
       const appointmentCount = appointments?.length || 0;
+      console.log('📅 Citas encontradas:', appointmentCount);
 
       // VALIDACIÓN 3: Validar modificación según citas existentes
       const modValidation = validateScheduleModification(
@@ -256,7 +285,7 @@ export default async function handler(
       // VALIDACIÓN 4: Validar nuevos datos
       const validation = validateSchedule({
         doctorId: updateData.doctor_id || existingSchedule.doctor_id,
-        dayOfWeek: updateData.day_of_week !== undefined ? updateData.day_of_week : existingSchedule.day_of_week,
+        specificDate: updateData.specific_date || existingSchedule.specific_date,
         startTime: updateData.start_time || existingSchedule.start_time,
         endTime: updateData.end_time || existingSchedule.end_time,
         slotDuration: updateData.slot_duration || existingSchedule.slot_duration
@@ -271,7 +300,7 @@ export default async function handler(
       }
 
       // Actualizar horario
-      const { data: updatedSchedule, error: updateError } = await supabaseServer
+      const { data: updatedSchedule, error: updateError } = await (supabaseServer
         .from('schedules')
         .update(updateData)
         .eq('id', id)
@@ -279,7 +308,7 @@ export default async function handler(
           *,
           doctor:doctors(id, name, specialty)
         `)
-        .single();
+        .single() as any);
 
       if (updateError) throw updateError;
 
@@ -308,11 +337,11 @@ export default async function handler(
       }
 
       // VALIDACIÓN: Verificar citas futuras
-      const { data: futureAppointments, error: apptError } = await supabaseServer
+      const { data: futureAppointments, error: apptError } = await (supabaseServer
         .from('time_slots')
-        .select('id, appointments!inner(id, status)')
+        .select('id, slot_date, appointments!inner(id, status)')
         .eq('schedule_id', id)
-        .gte('slot_date', formatDate(new Date(), 'yyyy-MM-dd'));
+        .gte('slot_date', formatDate(new Date(), 'yyyy-MM-dd')) as any);
 
       if (apptError) throw apptError;
 

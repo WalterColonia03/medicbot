@@ -44,17 +44,23 @@ export default async function handler(
   try {
     console.log('📱 WEBHOOK: Request recibido');
     console.log('Body completo:', JSON.stringify(req.body, null, 2));
-    
-    const { From, Body } = req.body;
-    
+
+    const { From, Body, MessageStatus, SmsStatus } = req.body;
+
+    // ========================================
+    // DETECTAR TIPO DE WEBHOOK DE TWILIO
+    // ========================================
+    // Si NO es un mensaje válido del usuario (falta From o Body), responder OK sin procesar
+    // Esto incluye actualizaciones de estado, entregas, lecturas, etc.
     if (!From || !Body) {
-      console.log('❌ WEBHOOK: From o Body undefined');
-      return res.status(400).json({ error: 'From y Body son requeridos' });
+      console.log('📱 WEBHOOK: Status update u otro evento recibido (ignorando):', { MessageStatus, SmsStatus });
+      return res.status(200).send('OK');
     }
-    
+
+    // Validar que sea un mensaje del usuario (ya tenemos From y Body)
     const phoneNumber = From.replace('whatsapp:', '');
     const message = Body.trim();
-    
+
     console.log('📱 De:', phoneNumber);
     console.log('💬 Mensaje:', message);
 
@@ -110,15 +116,6 @@ async function processMessage(session: any, message: string): Promise<string> {
   const lowerMessage = message.toLowerCase().trim();
 
   // ========================================
-  // DETECTAR CALIFICACIÓN (1-5)
-  // ========================================
-  const ratingMatch = lowerMessage.match(/^(?:calificar|rating|califico|calificación)?\s*([1-5])\s*(?:estrella|estrellas|⭐)?$/i);
-  if (ratingMatch) {
-    const rating = parseInt(ratingMatch[1]);
-    return await processRating(session, rating);
-  }
-
-  // ========================================
   // COMANDO: VER MIS CITAS
   // ========================================
   if (lowerMessage === 'mis citas' || lowerMessage === 'ver citas' || lowerMessage === 'citas') {
@@ -156,7 +153,7 @@ async function processMessage(session: any, message: string): Promise<string> {
 
   // Resetear sesión si el usuario escribe "nueva cita" o "ayuda"
   if (lowerMessage.includes('nueva cita') || lowerMessage.includes('ayuda') || lowerMessage.includes('hola') || lowerMessage.includes('menu')) {
-    await updateSession(session.id, { 
+    await updateSession(session.id, {
       current_step: 'greeting',
       selected_doctor_id: null,
       selected_date: null,
@@ -284,7 +281,13 @@ async function processMessage(session: any, message: string): Promise<string> {
         .limit(10);
 
       if (!availableSlots || availableSlots.length === 0) {
-        return 'Lo sentimos, no hay horarios disponibles para esa fecha.\n\n' +
+        const dateNames = {
+          '1': `hoy (${formatPeruDate(peruNow, 'dd/MM/yyyy')})`,
+          '2': `mañana (${formatPeruDate(addDays(peruNow, 1), 'dd/MM/yyyy')})`,
+          '3': `pasado mañana (${formatPeruDate(addDays(peruNow, 2), 'dd/MM/yyyy')})`
+        };
+        
+        return 'Lo sentimos, no hay horarios disponibles para ' + (dateNames[message as keyof typeof dateNames] || 'esa fecha') + '.\n\n' +
           'Por favor, selecciona otra fecha:\n' +
           '1. Hoy\n' +
           '2. Mañana\n' +
@@ -435,6 +438,18 @@ async function processMessage(session: any, message: string): Promise<string> {
     default:
       return 'Lo siento, algo salió mal. Escribe "ayuda" para comenzar de nuevo.';
   }
+
+  // ========================================
+  // DETECTAR CALIFICACIÓN (1-5) - SOLO SI NO HAY OTROS COMANDOS
+  // ========================================
+  const ratingMatch = lowerMessage.match(/^(?:calificar|rating|califico|calificación)?\s*([1-5])\s*(?:estrella|estrellas|⭐)?$/i);
+  if (ratingMatch && ratingMatch[1]) {
+    const rating = parseInt(ratingMatch[1]!);
+    return await processRating(session, rating);
+  }
+
+  // Si no coincide con ningún comando ni estado, mostrar mensaje por defecto
+  return 'No entendí tu mensaje. Escribe "ayuda" para ver los comandos disponibles.';
 }
 
 // ========================================
@@ -735,6 +750,16 @@ async function cancelAppointmentByCode(
     console.error('Error cancelling appointment:', error);
     return '❌ Error al cancelar la cita.\n\nIntenta nuevamente.';
   }
+}
+
+async function updateSession(sessionId: string, updates: any) {
+  await supabaseServer
+    .from('chat_sessions')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', sessionId);
 }
 
 async function sendWhatsAppMessage(to: string, message: string): Promise<void> {

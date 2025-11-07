@@ -24,12 +24,19 @@ export interface TimeSlot {
 
 export interface Schedule {
   id: string;
-  doctorName: string;
-  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
-  startTime: string; // HH:MM format
-  endTime: string; // HH:MM format
-  slotDuration: number; // en minutos
-  isActive: boolean;
+  doctor_id: string;
+  specific_date: string | null; // ISO format (YYYY-MM-DD) or null
+  start_time: string; // HH:MM format
+  end_time: string; // HH:MM format
+  slot_duration: number; // en minutos
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  doctor?: {
+    id: string;
+    name: string;
+    specialty: string;
+  };
 }
 
 export interface ChatMessage {

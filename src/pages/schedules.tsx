@@ -10,7 +10,7 @@ export default function SchedulesPage() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     doctor_id: '',
-    day_of_week: '1',
+    specific_date: '',
     start_time: '09:00',
     end_time: '17:00',
     slot_duration: '30',
@@ -55,7 +55,7 @@ export default function SchedulesPage() {
     try {
       const payload = {
         doctor_id: formData.doctor_id,
-        day_of_week: parseInt(formData.day_of_week),
+        specific_date: formData.specific_date,
         start_time: formData.start_time,
         end_time: formData.end_time,
         slot_duration: parseInt(formData.slot_duration),
@@ -76,7 +76,7 @@ export default function SchedulesPage() {
         setShowForm(false);
         setFormData({
           doctor_id: '',
-          day_of_week: '1',
+          specific_date: '',
           start_time: '09:00',
           end_time: '17:00',
           slot_duration: '30',
@@ -137,9 +137,9 @@ export default function SchedulesPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Horarios de Atención</h2>
+            <h2 className="text-3xl font-bold text-gray-900">Horarios por Fecha</h2>
             <p className="mt-2 text-gray-600">
-              Configura los horarios de cada médico
+              Crea horarios específicos para fechas particulares
             </p>
           </div>
           <button
@@ -154,7 +154,7 @@ export default function SchedulesPage() {
         {/* Formulario */}
         {showForm && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Crear Horario</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Crear Horario para Fecha Específica</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -177,20 +177,16 @@ export default function SchedulesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Día de la semana
+                  Fecha específica
                 </label>
-                <select
-                  value={formData.day_of_week}
-                  onChange={(e) => setFormData({ ...formData, day_of_week: e.target.value })}
+                <input
+                  type="date"
+                  value={formData.specific_date}
+                  onChange={(e) => setFormData({ ...formData, specific_date: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]} // No permitir fechas pasadas
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                   required
-                >
-                  {daysOfWeek.map((day, index) => (
-                    <option key={index} value={index}>
-                      {day}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -275,29 +271,34 @@ export default function SchedulesPage() {
                 className="bg-white rounded-lg shadow-md p-6"
               >
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
-                  {schedule.doctorName}
+                  {schedule.doctor?.name}
                 </h3>
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center text-gray-700">
                     <Calendar className="h-5 w-5 mr-2 text-primary-600" />
-                    <p className="text-sm">{daysOfWeek[schedule.dayOfWeek]}</p>
+                    <p className="text-sm">
+                      {schedule.specific_date 
+                        ? new Date(schedule.specific_date).toLocaleDateString('es-ES')
+                        : 'Fecha no especificada'
+                      }
+                    </p>
                   </div>
 
                   <div className="flex items-center text-gray-700">
                     <Clock className="h-5 w-5 mr-2 text-primary-600" />
                     <p className="text-sm">
-                      {schedule.startTime} - {schedule.endTime}
+                      {schedule.start_time} - {schedule.end_time}
                     </p>
                   </div>
 
                   <div className="text-sm text-gray-600">
-                    Duración por cita: {schedule.slotDuration} min
+                    Duración por cita: {schedule.slot_duration} min
                   </div>
                 </div>
 
                 <button
-                  onClick={() => generateTimeSlots(schedule.doctorName)}
+                  onClick={() => generateTimeSlots(schedule.doctor?.name || 'Doctor')}
                   className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"
                 >
                   Generar Espacios de Tiempo

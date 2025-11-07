@@ -12,7 +12,7 @@ export interface ValidationResult {
 
 export function validateSchedule(data: {
   doctorId?: string;
-  dayOfWeek?: number;
+  specificDate?: string;
   startTime?: string;
   endTime?: string;
   slotDuration?: number;
@@ -24,11 +24,39 @@ export function validateSchedule(data: {
     errors.push('Debe seleccionar un médico');
   }
 
-  // Validar día de la semana
-  if (data.dayOfWeek === undefined || data.dayOfWeek === null) {
-    errors.push('Debe seleccionar un día de la semana');
-  } else if (data.dayOfWeek < 0 || data.dayOfWeek > 6) {
-    errors.push('El día de la semana debe estar entre 0 (Domingo) y 6 (Sábado)');
+  // Validar fecha específica
+  if (!data.specificDate || data.specificDate.trim() === '') {
+    errors.push('Debe seleccionar una fecha específica');
+  } else {
+    const selectedDate = new Date(data.specificDate);
+    
+    if (!isValid(selectedDate)) {
+      errors.push('La fecha seleccionada no es válida');
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset to start of day for date comparison
+      const selectedDateOnly = new Date(selectedDate);
+      selectedDateOnly.setHours(0, 0, 0, 0);
+
+      // Check if selected date is before today (past dates not allowed)
+      if (isBefore(selectedDateOnly, today)) {
+        errors.push('No se pueden crear horarios para fechas pasadas');
+      }
+      // For today, we allow if the start time is in the future
+      else if (selectedDateOnly.getTime() === today.getTime()) {
+        // This will be validated in the schedule creation API with time consideration
+        // For now, allow today's date
+      }
+      // Check if selected date is more than 1 year in the future
+      else {
+        const oneYearLater = new Date();
+        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        
+        if (isAfter(selectedDateOnly, oneYearLater)) {
+          errors.push('No se pueden crear horarios con más de 1 año de anticipación');
+        }
+      }
+    }
   }
 
   // Validar formato de horas
@@ -336,8 +364,8 @@ export function validateScheduleModification(
     }
 
     // No permitir cambiar el día de la semana
-    if (newData.dayOfWeek !== undefined && newData.dayOfWeek !== existingSchedule.day_of_week) {
-      errors.push('No se puede cambiar el día de la semana cuando existen citas programadas');
+    if (newData.specificDate && newData.specificDate !== existingSchedule.specific_date) {
+      errors.push('No se puede cambiar la fecha específica cuando existen citas programadas');
     }
 
     // No permitir reducir el rango horario si afecta citas existentes
