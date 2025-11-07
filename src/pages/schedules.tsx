@@ -39,10 +39,19 @@ export default function SchedulesPage() {
     try {
       setLoading(true);
       const response = await fetch('/api/schedules');
-      const data = await response.json();
-      setSchedules(data);
+
+      if (response.ok) {
+        const data = await response.json();
+        // Asegurar que data sea un array
+        setSchedules(Array.isArray(data) ? data : []);
+      } else {
+        const errorData = await response.json();
+        console.error('Error:', errorData);
+        setSchedules([]); // Asegurar que sea un array vacío en caso de error
+      }
     } catch (error) {
       console.error('Error fetching schedules:', error);
+      setSchedules([]); // Asegurar que sea un array vacío
     } finally {
       setLoading(false);
     }
@@ -258,7 +267,7 @@ export default function SchedulesPage() {
           <div className="text-center py-12">
             <p className="text-gray-600">Cargando...</p>
           </div>
-        ) : schedules.length === 0 ? (
+        ) : !Array.isArray(schedules) || schedules.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No hay horarios configurados</p>
@@ -278,7 +287,7 @@ export default function SchedulesPage() {
                   <div className="flex items-center text-gray-700">
                     <Calendar className="h-5 w-5 mr-2 text-primary-600" />
                     <p className="text-sm">
-                      {schedule.specific_date 
+                      {schedule.specific_date
                         ? new Date(schedule.specific_date).toLocaleDateString('es-ES')
                         : 'Fecha no especificada'
                       }
