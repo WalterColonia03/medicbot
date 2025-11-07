@@ -7,30 +7,62 @@ export default function Home() {
     totalAppointments: 0,
     confirmedToday: 0,
     availableSlots: 0,
+    doctorsCount: 0,
+    cancelledThisWeek: 0,
+    notificationsSent: 0,
   });
 
   useEffect(() => {
-    // Cargar estadísticas
     fetchStats();
   }, []);
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/appointments?status=confirmed');
-      const appointments = await response.json();
-      
+      // Obtener todas las citas
+      const appointmentsResponse = await fetch('/api/appointments');
+      const allAppointments = await appointmentsResponse.json();
+
+      // Obtener citas confirmadas
+      const confirmedResponse = await fetch('/api/appointments?status=confirmed');
+      const confirmedAppointments = await confirmedResponse.json();
+
+      // Obtener doctores
+      const doctorsResponse = await fetch('/api/doctors');
+      const doctors = await doctorsResponse.json();
+
+      // Obtener slots disponibles
+      const slotsResponse = await fetch('/api/time-slots');
+      const slots = await slotsResponse.json();
+
+      // Calcular estadísticas
       const today = new Date().toISOString().split('T')[0];
-      const todayAppointments = appointments.filter(
-        (apt: any) => apt.date === today
+      const todayAppointments = confirmedAppointments.filter(
+        (apt: any) => apt.appointment_date === today
+      );
+
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoStr = weekAgo.toISOString().split('T')[0];
+
+      const cancelledThisWeek = allAppointments.filter(
+        (apt: any) => apt.status === 'cancelled' && apt.appointment_date >= weekAgoStr
+      );
+
+      const notificationsSent = allAppointments.filter(
+        (apt: any) => apt.notification_sent === true
       );
 
       setStats({
-        totalAppointments: appointments.length,
+        totalAppointments: allAppointments.length,
         confirmedToday: todayAppointments.length,
-        availableSlots: 0, // Se puede calcular
+        availableSlots: slots.filter((slot: any) => slot.is_available).length,
+        doctorsCount: doctors.length,
+        cancelledThisWeek: cancelledThisWeek.length,
+        notificationsSent: notificationsSent.length,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Mantener valores por defecto en caso de error
     }
   };
 
@@ -72,7 +104,7 @@ export default function Home() {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="p-3 bg-blue-100 rounded-full">
@@ -93,7 +125,7 @@ export default function Home() {
                 <Clock className="h-6 w-6 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Hoy</p>
+                <p className="text-sm font-medium text-gray-600">Citas Hoy</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {stats.confirmedToday}
                 </p>
@@ -108,7 +140,51 @@ export default function Home() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Médicos</p>
-                <p className="text-2xl font-bold text-gray-900">3</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.doctorsCount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-orange-100 rounded-full">
+                <Calendar className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Slots Disponibles</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.availableSlots}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-red-100 rounded-full">
+                <Clock className="h-6 w-6 text-red-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Canceladas (Semana)</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.cancelledThisWeek}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-teal-100 rounded-full">
+                <Bell className="h-6 w-6 text-teal-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Notificaciones</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.notificationsSent}
+                </p>
               </div>
             </div>
           </div>

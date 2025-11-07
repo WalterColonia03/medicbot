@@ -1,12 +1,12 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { adminDb } from '@/lib/firebase/admin';
-import { Appointment } from '@/lib/types';
-import twilio from 'twilio';
+// src/pages/api/notifications/send.ts
 
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseSecret = process.env.SUPABASE_SECRET;
+
+const supabase = createClient(supabaseUrl, supabaseKey, supabaseSecret);
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,7 +23,11 @@ export default async function handler(
       return res.status(400).json({ error: 'Appointment ID is required' });
     }
 
-    const appointmentDoc = await adminDb
+    const { data, error } = await supabase
+      .from('appointments')
+      .select()
+      .eq('id', appointmentId)
+      .single();
       .collection('appointments')
       .doc(appointmentId)
       .get();

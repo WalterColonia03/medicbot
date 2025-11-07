@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseServer } from '@/lib/supabase/server';
 import twilio from 'twilio';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isBefore } from 'date-fns';
+import { sendConfirmationNotification, sendCancellationNotification } from '@/lib/notifications';
 
 // Perú: UTC-5 (sin horario de verano)
 const PERU_UTC_OFFSET = -5;
@@ -106,7 +107,52 @@ async function getOrCreateSession(phoneNumber: string) {
 }
 
 async function processMessage(session: any, message: string): Promise<string> {
-  const lowerMessage = message.toLowerCase();
+  const lowerMessage = message.toLowerCase().trim();
+
+  // ========================================
+  // DETECTAR CALIFICACIÓN (1-5)
+  // ========================================
+  const ratingMatch = lowerMessage.match(/^(?:calificar|rating|califico|calificación)?\s*([1-5])\s*(?:estrella|estrellas|⭐)?$/i);
+  if (ratingMatch) {
+    const rating = parseInt(ratingMatch[1]);
+    return await processRating(session, rating);
+  }
+
+  // ========================================
+  // COMANDO: VER MIS CITAS
+  // ========================================
+  if (lowerMessage === 'mis citas' || lowerMessage === 'ver citas' || lowerMessage === 'citas') {
+    return await listMyAppointments(session.phone_number);
+  }
+
+  // ========================================
+  // COMANDO: CANCELAR CITA
+  // ========================================
+  if (lowerMessage.startsWith('cancelar ')) {
+    const appointmentCode = lowerMessage.replace('cancelar ', '').trim();
+    return await cancelAppointmentByCode(session.phone_number, appointmentCode);
+  }
+
+  // ========================================
+  // COMANDO: AYUDA
+  // ========================================
+  if (lowerMessage === 'ayuda' || lowerMessage === 'help' || lowerMessage === 'comandos') {
+    return `📋 *COMANDOS DISPONIBLES* 📋\n\n` +
+      `🆕 *nueva cita* - Agendar una cita nueva\n` +
+      `📅 *mis citas* - Ver tus citas programadas\n` +
+      `❌ *cancelar [codigo]* - Cancelar una cita\n` +
+      `⭐ *[1-5]* - Calificar tu última cita\n` +
+      `❓ *ayuda* - Ver este menú de ayuda\n\n` +
+      `💡 *Ejemplos:*\n` +
+      `• "mis citas"\n` +
+      `• "cancelar A1B2C3D4"\n` +
+      `• "5" (para calificar)\n` +
+      `• "nueva cita"\n\n` +
+      `📱 Recibirás notificaciones automáticas:\n` +
+      `✅ Confirmación inmediata\n` +
+      `⏰ Recordatorio 24h antes\n` +
+      `⭐ Solicitud de calificación post-cita`;
+  }
 
   // Resetear sesión si el usuario escribe "nueva cita" o "ayuda"
   if (lowerMessage.includes('nueva cita') || lowerMessage.includes('ayuda') || lowerMessage.includes('hola') || lowerMessage.includes('menu')) {
@@ -351,17 +397,16 @@ async function processMessage(session: any, message: string): Promise<string> {
 
       if (appointmentError) throw appointmentError;
 
-      // Registrar notificación
-      await supabaseServer
-        .from('notifications')
-        .insert({
-          appointment_id: appointment.id,
-          patient_id: patient!.id,
-          notification_type: 'confirmation',
-          phone_number: session.phone_number,
-          message: 'Cita confirmada',
-          status: 'sent',
-        });
+      // Enviar notificación de confirmación
+      await sendConfirmationNotification({
+        appointmentId: appointment.id,
+        patientName: patientName,
+        patientPhone: session.phone_number,
+        doctorName: appointment.doctor.name,
+        appointmentDate: appointment.appointment_date,
+        startTime: appointment.start_time,
+        endTime: appointment.end_time,
+      });
 
       // Marcar sesión como completada
       await updateSession(session.id, {
@@ -392,11 +437,304 @@ async function processMessage(session: any, message: string): Promise<string> {
   }
 }
 
-async function updateSession(sessionId: string, updates: any): Promise<void> {
-  await supabaseServer
-    .from('chat_sessions')
-    .update(updates)
-    .eq('id', sessionId);
+// ========================================
+// FUNCIÓN: PROCESAR SOLICITUDES DE CALIFICACIÓN
+// ========================================
+async function processRatingRequests(): Promise<void> {
+  try {
+    // Buscar citas que terminaron hace 24 horas y no han sido calificadas
+    const yesterday = format(addDays(getPeruDateTime(), -1), 'yyyy-MM-dd');
+
+    const { data: appointments } = await supabaseServer
+      .from('appointments')
+      .select(`
+        id,
+        appointment_date,
+        end_time,
+        status,
+        rating_requested,
+        rated,
+        patient:patients(name, phone),
+        doctor:doctors(name)
+      `)
+      .eq('appointment_date', yesterday)
+      .eq('status', 'confirmed')
+      .eq('rating_requested', false)
+      .eq('rated', false);
+
+    if (!appointments || appointments.length === 0) {
+      console.log('No hay solicitudes de calificación pendientes');
+      return;
+    }
+
+    console.log(`⭐ Enviando ${appointments.length} solicitudes de calificación...`);
+
+    for (const apt of appointments) {
+      const message = `⭐ *CALIFICA TU EXPERIENCIA* ⭐\n\n` +
+        `Hola ${apt.patient.name},\n\n` +
+        `¿Cómo fue tu experiencia con el Dr. ${apt.doctor.name}?\n\n` +
+        `Responde con un número del 1 al 5:\n` +
+        `⭐ 5 - Excelente\n` +
+        `⭐ 4 - Muy buena\n` +
+        `⭐ 3 - Buena\n` +
+        `⭐ 2 - Regular\n` +
+        `⭐ 1 - Mala\n\n` +
+        `Tu opinión nos ayuda a mejorar. ¡Gracias! 🙏`;
+
+      // Enviar mensaje por WhatsApp
+      await sendWhatsAppMessage(`whatsapp:${apt.patient.phone}`, message);
+
+      // Marcar como solicitud enviada
+      await supabaseServer
+        .from('appointments')
+        .update({ rating_requested: true })
+        .eq('id', apt.id);
+
+      // Registrar en notificaciones
+      await supabaseServer.from('notifications').insert({
+        appointment_id: apt.id,
+        patient_id: apt.patient.id,
+        notification_type: 'rating_request',
+        phone_number: apt.patient.phone,
+        message: message,
+        status: 'sent',
+      });
+
+      // Pequeña pausa
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    console.log('✅ Solicitudes de calificación enviadas');
+  } catch (error) {
+    console.error('❌ Error procesando solicitudes de calificación:', error);
+  }
+}
+
+// ========================================
+// FUNCIÓN: PROCESAR CALIFICACIÓN RECIBIDA
+// ========================================
+async function processRating(session: any, rating: number, comments?: string): Promise<string> {
+  try {
+    // Buscar la cita más reciente del paciente que tenga rating_requested = true
+    const { data: appointment } = await supabaseServer
+      .from('appointments')
+      .select(`
+        id,
+        patient:patients(name),
+        doctor:doctors(name)
+      `)
+      .eq('patient_id', session.patient_id)
+      .eq('rating_requested', true)
+      .eq('rated', false)
+      .order('appointment_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!appointment) {
+      return '❌ No encontramos una cita pendiente de calificación.\n\n' +
+        'Si deseas calificar una cita anterior, por favor contacta directamente.';
+    }
+
+    // Guardar la calificación
+    await supabaseServer.from('appointment_ratings').insert({
+      appointment_id: appointment.id,
+      rating: rating,
+      comments: comments || null,
+    });
+
+    // Marcar como calificada
+    await supabaseServer
+      .from('appointments')
+      .update({ rated: true })
+      .eq('id', appointment.id);
+
+    // Registrar notificación
+    await supabaseServer.from('notifications').insert({
+      appointment_id: appointment.id,
+      patient_id: session.patient_id,
+      notification_type: 'rating_received',
+      phone_number: session.phone_number,
+      message: `Calificación recibida: ${rating} estrella(s)`,
+      status: 'sent',
+    });
+
+    const stars = '⭐'.repeat(rating);
+    return `✅ *CALIFICACIÓN RECIBIDA* ✅\n\n` +
+      `Gracias por tu calificación: ${stars}\n\n` +
+      `Tu opinión nos ayuda a mejorar nuestros servicios.\n\n` +
+      `¿Necesitas agendar otra cita? Escribe "nueva cita".`;
+  } catch (error) {
+    console.error('Error procesando calificación:', error);
+    return '❌ Error al procesar tu calificación.\n\nIntenta nuevamente.';
+  }
+}
+
+// ========================================
+// FUNCIÓN: LISTAR MIS CITAS
+// ========================================
+async function listMyAppointments(phoneNumber: string): Promise<string> {
+  try {
+    // Buscar paciente
+    const { data: patient } = await supabaseServer
+      .from('patients')
+      .select('id, name')
+      .eq('phone', phoneNumber)
+      .single();
+
+    if (!patient) {
+      return '❌ No encontramos tu registro.\n\n' +
+        'Primero debes agendar una cita escribiendo "nueva cita".';
+    }
+
+    // Obtener citas futuras
+    const today = formatPeruDate(getPeruDateTime(), 'yyyy-MM-dd');
+
+    const { data: appointments } = await supabaseServer
+      .from('appointments')
+      .select(`
+        id,
+        appointment_date,
+        start_time,
+        end_time,
+        status,
+        reason,
+        doctor:doctors(name, specialty)
+      `)
+      .eq('patient_id', patient.id)
+      .gte('appointment_date', today)
+      .in('status', ['confirmed', 'pending'])
+      .order('appointment_date', { ascending: true })
+      .order('start_time', { ascending: true });
+
+    if (!appointments || appointments.length === 0) {
+      return `Hola ${patient.name} 👋\n\n` +
+        `No tienes citas programadas.\n\n` +
+        `💬 Escribe "nueva cita" para agendar una.`;
+    }
+
+    // Formatear lista de citas
+    let message = `📅 *TUS CITAS PROGRAMADAS* 📅\n\n`;
+    message += `Hola ${patient.name},\n\n`;
+    message += `Tienes ${appointments.length} cita(s) programada(s):\n\n`;
+
+    appointments.forEach((apt, index) => {
+      const date = format(new Date(apt.appointment_date), 'dd/MM/yyyy');
+      const code = apt.id.substring(0, 8).toUpperCase();
+      const statusEmoji = apt.status === 'confirmed' ? '✅' : '⏳';
+
+      message += `${index + 1}. ${statusEmoji} *${apt.doctor.name}*\n`;
+      message += `   ${apt.doctor.specialty}\n`;
+      message += `   📅 ${date} a las ${apt.start_time.substring(0, 5)}\n`;
+      message += `   🔑 Código: ${code}\n`;
+      if (apt.reason) {
+        message += `   📝 Motivo: ${apt.reason}\n`;
+      }
+      message += `\n`;
+    });
+
+    message += `💡 *Para cancelar una cita:*\n`;
+    message += `Escribe: cancelar [codigo]\n`;
+    message += `Ejemplo: "cancelar ${appointments[0].id.substring(0, 8).toUpperCase()}"`;
+
+    return message;
+  } catch (error) {
+    console.error('Error listing appointments:', error);
+    return '❌ Error al obtener tus citas.\n\nIntenta nuevamente en unos momentos.';
+  }
+}
+
+// ========================================
+// FUNCIÓN: CANCELAR CITA POR CÓDIGO
+// ========================================
+async function cancelAppointmentByCode(
+  phoneNumber: string,
+  appointmentCode: string
+): Promise<string> {
+  try {
+    // Validar código
+    if (appointmentCode.length < 8) {
+      return '❌ Código inválido.\n\n' +
+        'El código debe tener 8 caracteres.\n\n' +
+        '💡 Escribe "mis citas" para ver tus códigos.';
+    }
+
+    // Buscar paciente
+    const { data: patient } = await supabaseServer
+      .from('patients')
+      .select('id, name')
+      .eq('phone', phoneNumber)
+      .single();
+
+    if (!patient) {
+      return '❌ No encontramos tu registro.';
+    }
+
+    // Buscar cita por código
+    const { data: appointments } = await supabaseServer
+      .from('appointments')
+      .select(`
+        id,
+        appointment_date,
+        start_time,
+        status,
+        doctor:doctors(name)
+      `)
+      .eq('patient_id', patient.id)
+      .in('status', ['confirmed', 'pending']);
+
+    const appointment = appointments?.find(apt =>
+      apt.id.substring(0, 8).toUpperCase() === appointmentCode.toUpperCase()
+    );
+
+    if (!appointment) {
+      return '❌ No encontramos una cita con ese código.\n\n' +
+        '💡 Verifica el código con "mis citas"';
+    }
+
+    // Verificar que no sea del pasado
+    const appointmentDate = new Date(`${appointment.appointment_date}T${appointment.start_time}`);
+    const now = getPeruDateTime();
+
+    if (isBefore(appointmentDate, now)) {
+      return '❌ No puedes cancelar citas pasadas.\n\n' +
+        'Esta cita ya ocurrió o está en curso.';
+    }
+
+    // Cancelar cita
+    const { error } = await supabaseServer
+      .from('appointments')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: 'Cancelada por el paciente vía WhatsApp'
+      })
+      .eq('id', appointment.id);
+
+    if (error) throw error;
+
+    // Enviar notificación de cancelación
+    await sendCancellationNotification({
+      appointmentId: appointment.id,
+      patientName: patient.name,
+      patientPhone: phoneNumber,
+      doctorName: appointment.doctor.name,
+      appointmentDate: appointment.appointment_date,
+      startTime: appointment.start_time,
+      endTime: appointment.start_time, // No tenemos end_time aquí, pero es requerido
+    }, 'Cancelada por el paciente vía WhatsApp');
+
+    return `✅ *CITA CANCELADA* ✅\n\n` +
+      `Tu cita ha sido cancelada:\n\n` +
+      `👨‍⚕️ Médico: ${appointment.doctor.name}\n` +
+      `📅 Fecha: ${format(new Date(appointment.appointment_date), 'dd/MM/yyyy')}\n` +
+      `🕐 Hora: ${appointment.start_time.substring(0, 5)}\n\n` +
+      `El horario está nuevamente disponible.\n\n` +
+      `💬 Escribe "nueva cita" para agendar otra.`;
+
+  } catch (error) {
+    console.error('Error cancelling appointment:', error);
+    return '❌ Error al cancelar la cita.\n\nIntenta nuevamente.';
+  }
 }
 
 async function sendWhatsAppMessage(to: string, message: string): Promise<void> {
